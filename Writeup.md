@@ -6,3 +6,12 @@ the same boxID in the previous frame and count them.
 
 <img src = "images/FP_1.1.png">
 <img src = "images/FP_1.2.png">
+
+### FP.2 Compute Lidar-based TTC
+I implemented the "computeTTCLidar" function by first fitlering the point clouds to avoid points with low reflectivity and points with higher
+y-coordinate than the average y-coordinate , I then calculcate the TTC using the average X found in the filtered point clouds to make the
+function more robust and more dependent on the average readings instead of taking the lowest point , this way if there was an errorness in some points
+the average will cover it in the final reading to get accurate TTC.
+
+<img src = "images/FP_2.1.png">
+<img src = "images/FP_2.2.png">
