@@ -22,7 +22,11 @@ I implemented the function "clusterKptMatchesWithROI" by filtering keypoint matc
 <img src = "images/FP_3.1.png">
 
 
+### FP.4 Compute Camera-based TTC
+I implemented the "computeTTCCamera" Just like the implementation in the task assigned during the camera course , I used the median distance ratio as a filter instead of the mean.
 
+<img src = "images/FP_4.1.png">
+<img src = "images/FP_4.2.png">
 
 
 ### FP.5 Performance Evaluation 1
@@ -36,3 +40,7 @@ I noticed that in example 2 and 3 the TTC was higher with a significant amount c
 <img src = "images/FP_5.6.png">
 <img src = "images/FP_5.7.png">
 <img src = "images/FP_5.8.png">
+
+
+
+### FP.6 Performance Evaluation 2
