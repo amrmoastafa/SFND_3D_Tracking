@@ -45,6 +45,11 @@ I noticed that in example 2 and 3 the TTC was higher with a significant amount c
 
 ### FP.6 Performance Evaluation 2
 From Midterm Project , The best 3 Detector/Descriptors combinations are :
-    FAST + BRIEF
-    FAST + ORB
-    FAST/FREAK
+1. **FAST + BRIEF**
+2. **FAST + ORB**
+3. **FAST/FREAK**
+
+I carried out a comparison between the performance of each of them compared to Lidar to compute TTC and saved the result output in "TASK FP.6" csv file.
+
+<img src = "images/FP_6.png">
+
