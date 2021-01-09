@@ -16,6 +16,12 @@ the average will cover it in the final reading to get accurate TTC.
 <img src = "images/FP_2.1.png">
 <img src = "images/FP_2.2.png">
 
+### FP.3 Associate Keypoint Correspondences with Bounding Boxes
+I implemented the function "clusterKptMatchesWithROI" by filtering keypoint matched based on the mean distance calculated , I multiplied it by a certain threshold to avoid neglecting too many keypoints.
+
+<img src = "images/FP_3.1.png">
+
+
 
 
 
