@@ -15,3 +15,18 @@ the average will cover it in the final reading to get accurate TTC.
 
 <img src = "images/FP_2.1.png">
 <img src = "images/FP_2.2.png">
+
+
+
+
+### FP.5 Performance Evaluation 1
+I noticed that in example 2 and 3 the TTC was higher with a significant amount compared to the previous and preceding examples , as shown in the figures below , I addressed this problem by adding a tolerance to the filters I applied on Lidar PCL when filtering them , this allowed for more PCLs with low reflectivity that were key PCL to be detected and not neglected.
+
+<img src = "images/FP_5.1.png">
+<img src = "images/FP_5.2.png">
+<img src = "images/FP_5.3.png">
+<img src = "images/FP_5.4.png">
+<img src = "images/FP_5.5.png">
+<img src = "images/FP_5.6.png">
+<img src = "images/FP_5.7.png">
+<img src = "images/FP_5.8.png">
