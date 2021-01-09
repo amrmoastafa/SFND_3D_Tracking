@@ -4,7 +4,7 @@
 #include <numeric>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-
+#include <unordered_map>
 #include "camFusion.hpp"
 #include "dataStructures.h"
 
@@ -138,7 +138,38 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
 // associate a given bounding box with the keypoints it contains
 void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr, std::vector<cv::DMatch> &kptMatches)
 {
-    // ...
+    double mean_distance = 0;
+    std::vector<cv::DMatch>  roi_kptMatches;
+    for(auto kptMatch : kptMatches)
+    {
+        cv::KeyPoint kpt = kptsCurr.at(kptMatch.trainIdx);
+        if (boundingBox.roi.contains( cv::Point(kpt.pt.x, kpt.pt.y) ) ) 
+        {
+            roi_kptMatches.push_back(kptMatch);
+        }
+
+    }
+    for(auto kptMatch : roi_kptMatches)
+    {
+        mean_distance += kptMatch.distance;
+    }
+    if (roi_kptMatches.size() > 0)
+    {
+        mean_distance = mean_distance / roi_kptMatches.size();
+    }else
+    {
+        return;
+    }
+    
+    double tolerance = 1.3;
+
+    for(auto kptMatch : roi_kptMatches)
+    {
+        if(kptMatch.distance < tolerance * mean_distance)
+        {
+            boundingBox.kptMatches.push_back(kptMatch);
+        }
+    }
 }
 
 
@@ -146,18 +177,179 @@ void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint
 void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr, 
                       std::vector<cv::DMatch> kptMatches, double frameRate, double &TTC, cv::Mat *visImg)
 {
-    // ...
+    // compute distance ratios between all matched keypoints
+    vector<double> distRatios; // stores the distance ratios for all keypoints between curr. and prev. frame
+    for (auto it1 = kptMatches.begin(); it1 != kptMatches.end() - 1; ++it1)
+    { // outer keypoint loop
+
+        // get current keypoint and its matched partner in the prev. frame
+        cv::KeyPoint kpOuterCurr = kptsCurr.at(it1->trainIdx);
+        cv::KeyPoint kpOuterPrev = kptsPrev.at(it1->queryIdx);
+
+        for (auto it2 = kptMatches.begin() + 1; it2 != kptMatches.end(); ++it2)
+        { // inner keypoint loop
+
+            double minDist = 100.0; // min. required distance
+
+            // get next keypoint and its matched partner in the prev. frame
+            cv::KeyPoint kpInnerCurr = kptsCurr.at(it2->trainIdx);
+            cv::KeyPoint kpInnerPrev = kptsPrev.at(it2->queryIdx);
+
+            // compute distances and distance ratios
+            double distCurr = cv::norm(kpOuterCurr.pt - kpInnerCurr.pt);
+            double distPrev = cv::norm(kpOuterPrev.pt - kpInnerPrev.pt);
+
+            if (distPrev > std::numeric_limits<double>::epsilon() && distCurr >= minDist)
+            { // avoid division by zero
+
+                double distRatio = distCurr / distPrev;
+                distRatios.push_back(distRatio);
+            }
+        } // eof inner loop over all matched kpts
+    }     // eof outer loop over all matched kpts
+
+    // only continue if list of distance ratios is not empty
+    if (distRatios.size() == 0)
+    {
+        TTC = NAN;
+        return;
+    }
+
+    // compute camera-based TTC from distance ratios
+    double meanDistRatio = std::accumulate(distRatios.begin(), distRatios.end(), 0.0) / distRatios.size();
+    std::sort(distRatios.begin(),distRatios.end());
+    long medIndex = floor(distRatios.size() / 2.0);
+    /*    double medDistRatio = distRatios.size() % 2 == 0 ? (distRatios[medIndex - 1] + distRatios[medIndex]) / 2.0 : distRatios[medIndex]; // compute median dist. ratio to remove outlier influence*/
+    double medianDistRatio = distRatios.size() % 2 != 0 ? (distRatios[medIndex]) : ( distRatios[medIndex-1] + distRatios[medIndex] ) / 2.0;
+    double dT = 1 / frameRate;
+    TTC = -dT / (1 - medianDistRatio);
 }
 
 
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
                      std::vector<LidarPoint> &lidarPointsCurr, double frameRate, double &TTC)
 {
-    // ...
+    /* In order to calculate an accurate and robust reading , the pointclouds must be filtered first */
+    /* I will first get the average reflectivity and filter points based on the average reflectivity as well as the average y-coordinate */
+    double average_reflectivity = 0;
+    double tolerance = 0.25;
+    for(auto point: lidarPointsCurr)
+    {
+        average_reflectivity += point.r;
+    }
+    average_reflectivity = average_reflectivity * tolerance / lidarPointsCurr.size();
+    std::vector<LidarPoint> lidarPointsPrev_filtered , lidarPointsCurr_filtered;
+    for (auto point: lidarPointsCurr)
+    {
+        if(abs(point.y) < 2)
+        {
+            if(point.r > average_reflectivity)
+            {
+                lidarPointsCurr_filtered.push_back(point);
+            }
+        }
+    }
+
+    average_reflectivity = 0;
+    for(auto point: lidarPointsPrev)
+    {
+        average_reflectivity += point.r;
+    }
+    average_reflectivity = average_reflectivity * tolerance / lidarPointsPrev.size();
+    for (auto point: lidarPointsPrev)
+    {
+        if(abs(point.y) < 2)
+        {
+            if(point.r > average_reflectivity)
+            {
+                lidarPointsPrev_filtered.push_back(point);
+            }
+        }
+    }
+    /* I will then calculate the average X prev and Current and use it to calculate the TTC */
+    double X_Prev = 0 , X_Curr = 0;
+
+    for (auto point: lidarPointsPrev_filtered)
+    {
+        X_Prev += point.x;
+    }
+
+
+    X_Prev = X_Prev / lidarPointsPrev_filtered.size();
+    for(auto point: lidarPointsCurr_filtered)
+    {
+        X_Curr += point.x;
+    }
+    X_Curr = X_Curr / lidarPointsCurr_filtered.size();
+    TTC = (X_Curr * (1/frameRate) ) / (X_Prev - X_Curr);
+
 }
 
 
 void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bbBestMatches, DataFrame &prevFrame, DataFrame &currFrame)
 {
-    // ...
+    std::multimap<int, int> mmap {};
+
+    for (auto match : matches)
+    {
+                        // Make an outer loops over all keypoint matches
+        cv::KeyPoint prevKp = prevFrame.keypoints[match.queryIdx];
+        cv::KeyPoint currKp = currFrame.keypoints[match.trainIdx];
+                // Find out by which bounding boxes are the keypoints enclosed both in the prev frame and in the current frame
+        int prevBoxID, currBoxID;
+
+            for (auto bbox : prevFrame.boundingBoxes)
+            {
+                if (bbox.roi.contains(prevKp.pt))
+                {
+                    prevBoxID = bbox.boxID;
+                }
+            }
+
+            for (auto bbox : currFrame.boundingBoxes)
+            {
+                if (bbox.roi.contains(currKp.pt))
+                {
+                    currBoxID = bbox.boxID;
+                }
+            }
+            // We now optained potential candidates that can be best matches to each other and we need to store their IDs in a map.
+        mmap.insert({currBoxID, prevBoxID});
+    }
+
+
+    vector<int> currFrameBoxIDs {};
+    // Create a vector of box IDs for all bounding boxes in the current frame
+    for (auto box : currFrame.boundingBoxes)
+    {
+        currFrameBoxIDs.push_back(box.boxID);
+    }
+
+    // Find all the match candidates in the multimap that share the boxID in the previous frame and count them
+    for (int k : currFrameBoxIDs)
+    {
+        // We need to use the equal_range attribute to find only the bounding box with ID equal to the ID of the current frame box ID
+        auto it = mmap.equal_range(k);
+        unordered_map<int, int> hash;
+
+        for (auto itr = it.first; itr != it.second; ++itr)
+        {
+            hash[itr->second]++;
+        }
+
+        // find the max frequency
+        int max_count = 0, res = -1;
+
+        for (auto i : hash)
+        {
+            if (max_count < i.second)
+            {
+                res = i.first;
+                max_count = i.second;
+            }
+        }
+
+        bbBestMatches.insert({res, k});
+    }
+
 }
