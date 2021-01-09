@@ -44,3 +44,7 @@ I noticed that in example 2 and 3 the TTC was higher with a significant amount c
 
 
 ### FP.6 Performance Evaluation 2
+From Midterm Project , The best 3 Detector/Descriptors combinations are :
+    FAST + BRIEF
+    FAST + ORB
+    FAST/FREAK
